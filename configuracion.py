@@ -8,7 +8,7 @@ EMPRESA = {
     "subtitulo": "Material eléctrico, redes y telecomunicaciones",
     "direccion": "Quito - Ecuador - Calle N89 - Pasaje E2B",
     "telefono": "+593 98 758 9412",
-    "email": "ventasn@electrolinkec.com",
+    "email": "ventas@electrolinkec.com",
     "logo_path": os.path.join(BASE_DIR, "recursos", "logo.png"),
 }
 
