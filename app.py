@@ -79,9 +79,11 @@ st.markdown(
         border: 2px solid #004FAF;
         border-radius: 12px;
         padding: 14px 18px;
+
         display: flex;
         align-items: center;
         justify-content: center;
+
         cursor: pointer;
     }
 
@@ -162,6 +164,47 @@ if "numero_original_edicion" not in st.session_state:
 if "fecha_cotizacion" not in st.session_state:
     st.session_state["fecha_cotizacion"] = datetime.now().date()
 
+# Estado para editar un ítem individual
+if "indice_item_edicion" not in st.session_state:
+    st.session_state["indice_item_edicion"] = None
+
+if "item_edicion" not in st.session_state:
+    st.session_state["item_edicion"] = None
+
+# Se utiliza para crear formularios nuevos y evitar
+# que Streamlit mantenga valores antiguos.
+if "form_item_version" not in st.session_state:
+    st.session_state["form_item_version"] = 0
+
+
+# =========================================================
+# VALORES PREDETERMINADOS DE CONDICIONES
+# =========================================================
+
+if "descuento_total" not in st.session_state:
+    st.session_state["descuento_total"] = 0.0
+
+if "aplica_iva" not in st.session_state:
+    st.session_state["aplica_iva"] = True
+
+if "forma_pago" not in st.session_state:
+    st.session_state["forma_pago"] = "CONTADO"
+
+if "tiempo_entrega" not in st.session_state:
+    st.session_state["tiempo_entrega"] = "ENTREGA INMEDIATA"
+
+if "validez_oferta" not in st.session_state:
+    st.session_state["validez_oferta"] = "7 DÍAS"
+
+if "lugar_entrega" not in st.session_state:
+    st.session_state["lugar_entrega"] = "QUITO"
+
+if "garantia" not in st.session_state:
+    st.session_state["garantia"] = "SEGÚN FABRICANTE"
+
+if "observaciones" not in st.session_state:
+    st.session_state["observaciones"] = ""
+
 
 # =========================================================
 # FUNCIÓN PARA CARGAR UNA COTIZACIÓN Y EDITARLA
@@ -204,35 +247,45 @@ def cargar_cotizacion_para_editar(cotizacion):
         "fecha_cotizacion"
     ] = fecha_edicion
 
-    st.session_state["cliente"] = str(
+    st.session_state[
+        "cliente"
+    ] = str(
         cotizacion.get(
             "cliente",
             "",
         )
     )
 
-    st.session_state["ruc_cliente"] = str(
+    st.session_state[
+        "ruc_cliente"
+    ] = str(
         cotizacion.get(
             "ruc",
             "",
         )
     )
 
-    st.session_state["direccion_cliente"] = str(
+    st.session_state[
+        "direccion_cliente"
+    ] = str(
         cotizacion.get(
             "direccion",
             "",
         )
     )
 
-    st.session_state["telefono_cliente"] = str(
+    st.session_state[
+        "telefono_cliente"
+    ] = str(
         cotizacion.get(
             "telefono",
             "",
         )
     )
 
-    st.session_state["correo_cliente"] = str(
+    st.session_state[
+        "correo_cliente"
+    ] = str(
         cotizacion.get(
             "correo",
             "",
@@ -337,6 +390,19 @@ def cargar_cotizacion_para_editar(cotizacion):
             "",
         )
     )
+
+    # Limpiar cualquier edición de ítem anterior
+    st.session_state[
+        "indice_item_edicion"
+    ] = None
+
+    st.session_state[
+        "item_edicion"
+    ] = None
+
+    st.session_state[
+        "form_item_version"
+    ] += 1
 
     st.session_state[
         "modo_edicion"
@@ -720,8 +786,10 @@ if seccion == "COTIZACIONES REALIZADAS":
 
                 try:
 
-                    pdf_historial = generar_pdf_cotizacion(
-                        datos_pdf
+                    pdf_historial = (
+                        generar_pdf_cotizacion(
+                            datos_pdf
+                        )
                     )
 
                     nombre_pdf = (
@@ -741,18 +809,12 @@ if seccion == "COTIZACIONES REALIZADAS":
                     )
 
                     st.download_button(
-                        label=(
-                            "DESCARGAR PDF"
-                        ),
-                        data=(
-                            pdf_historial
-                        ),
+                        label="DESCARGAR PDF",
+                        data=pdf_historial,
                         file_name=(
                             f"{nombre_pdf}.pdf"
                         ),
-                        mime=(
-                            "application/pdf"
-                        ),
+                        mime="application/pdf",
                         key=(
                             f"pdf_historial_"
                             f"{indice}"
@@ -802,11 +864,6 @@ with st.expander(
         ),
         key="numero_cotizacion",
     )
-
-    if "fecha_cotizacion" not in st.session_state:
-        st.session_state[
-            "fecha_cotizacion"
-        ] = datetime.now().date()
 
     fecha = st.date_input(
         "Fecha",
@@ -865,26 +922,131 @@ with st.expander(
 
 
 # =========================================================
-# AGREGAR PRODUCTO
+# AGREGAR / EDITAR PRODUCTO
 # =========================================================
 
+item_edicion = st.session_state.get(
+    "item_edicion"
+)
+
+indice_item_edicion = st.session_state.get(
+    "indice_item_edicion"
+)
+
+editando_item = (
+    item_edicion is not None
+    and
+    indice_item_edicion is not None
+)
+
+
 with st.expander(
-    "3. AGREGAR PRODUCTO",
+    "3. AGREGAR / EDITAR PRODUCTO",
     expanded=True,
 ):
 
+    if editando_item:
+
+        st.info(
+            f"✏️ ESTÁS EDITANDO EL ÍTEM "
+            f"{indice_item_edicion + 1}. "
+            f"Modifica los datos y presiona "
+            f"GUARDAR CAMBIOS DEL ÍTEM."
+        )
+
+    unidades = [
+        "UND",
+        "M",
+        "M2",
+        "M3",
+        "KG",
+        "LT",
+        "GL",
+        "ROLLO",
+        "CAJA",
+        "KIT",
+        "PAR",
+        "SERVICIO",
+    ]
+
+    if editando_item:
+
+        codigo_default = str(
+            item_edicion.get(
+                "codigo",
+                "",
+            )
+        )
+
+        descripcion_default = str(
+            item_edicion.get(
+                "descripcion",
+                "",
+            )
+        )
+
+        marca_default = str(
+            item_edicion.get(
+                "marca",
+                "",
+            )
+        )
+
+        unidad_default = str(
+            item_edicion.get(
+                "unidad",
+                "UND",
+            )
+        )
+
+        cantidad_default = float(
+            item_edicion.get(
+                "cantidad",
+                1.0,
+            )
+        )
+
+        precio_default = float(
+            item_edicion.get(
+                "precio",
+                0.0,
+            )
+        )
+
+    else:
+
+        codigo_default = ""
+        descripcion_default = ""
+        marca_default = ""
+        unidad_default = "UND"
+        cantidad_default = 1.0
+        precio_default = 0.0
+
+    if unidad_default not in unidades:
+        unidad_default = "UND"
+
+    version_form = st.session_state[
+        "form_item_version"
+    ]
+
     with st.form(
-        key="formulario_producto",
-        clear_on_submit=True,
+        key=(
+            f"formulario_producto_"
+            f"{version_form}"
+        ),
+        clear_on_submit=(
+            not editando_item
+        ),
     ):
 
         codigo = st.text_input(
             "Código o número de parte",
-            placeholder="Opcional",
+            value=codigo_default,
         )
 
         descripcion = st.text_area(
             "Descripción",
+            value=descripcion_default,
             placeholder=(
                 "Descripción completa "
                 "del producto"
@@ -893,31 +1055,21 @@ with st.expander(
 
         marca = st.text_input(
             "Marca",
-            placeholder="Opcional",
+            value=marca_default,
         )
 
         unidad = st.selectbox(
             "Unidad",
-            options=[
-                "UND",
-                "M",
-                "M2",
-                "M3",
-                "KG",
-                "LT",
-                "GL",
-                "ROLLO",
-                "CAJA",
-                "KIT",
-                "PAR",
-                "SERVICIO",
-            ],
+            options=unidades,
+            index=unidades.index(
+                unidad_default
+            ),
         )
 
         cantidad = st.number_input(
             "Cantidad",
             min_value=0.01,
-            value=1.00,
+            value=cantidad_default,
             step=1.00,
             format="%.2f",
         )
@@ -925,18 +1077,26 @@ with st.expander(
         precio = st.number_input(
             "Precio unitario",
             min_value=0.00,
-            value=0.00,
+            value=precio_default,
             step=0.01,
             format="%.2f",
         )
 
-        agregar = st.form_submit_button(
-            "AGREGAR ÍTEM",
-            type="primary",
-            use_container_width=True,
+        texto_boton_item = (
+            "GUARDAR CAMBIOS DEL ÍTEM"
+            if editando_item
+            else "AGREGAR ÍTEM"
         )
 
-    if agregar:
+        guardar_item = (
+            st.form_submit_button(
+                texto_boton_item,
+                type="primary",
+                use_container_width=True,
+            )
+        )
+
+    if guardar_item:
 
         if not descripcion.strip():
 
@@ -961,33 +1121,90 @@ with st.expander(
 
         else:
 
+            nuevo_item = {
+                "codigo":
+                    codigo.strip(),
+
+                "descripcion":
+                    descripcion.strip(),
+
+                "marca":
+                    marca.strip(),
+
+                "unidad":
+                    unidad,
+
+                "cantidad":
+                    float(cantidad),
+
+                "precio":
+                    float(precio),
+            }
+
+            if editando_item:
+
+                st.session_state[
+                    "items_cotizacion"
+                ][
+                    indice_item_edicion
+                ] = nuevo_item
+
+                st.session_state[
+                    "indice_item_edicion"
+                ] = None
+
+                st.session_state[
+                    "item_edicion"
+                ] = None
+
+                st.session_state[
+                    "form_item_version"
+                ] += 1
+
+                st.success(
+                    "Ítem actualizado correctamente."
+                )
+
+            else:
+
+                st.session_state[
+                    "items_cotizacion"
+                ].append(
+                    nuevo_item
+                )
+
+                st.session_state[
+                    "form_item_version"
+                ] += 1
+
+                st.success(
+                    "Ítem agregado correctamente."
+                )
+
+            st.rerun()
+
+    if editando_item:
+
+        if st.button(
+            "CANCELAR EDICIÓN DEL ÍTEM",
+            key=(
+                f"cancelar_item_"
+                f"{version_form}"
+            ),
+            use_container_width=True,
+        ):
+
             st.session_state[
-                "items_cotizacion"
-            ].append(
-                {
-                    "codigo":
-                        codigo.strip(),
+                "indice_item_edicion"
+            ] = None
 
-                    "descripcion":
-                        descripcion.strip(),
+            st.session_state[
+                "item_edicion"
+            ] = None
 
-                    "marca":
-                        marca.strip(),
-
-                    "unidad":
-                        unidad,
-
-                    "cantidad":
-                        float(cantidad),
-
-                    "precio":
-                        float(precio),
-                }
-            )
-
-            st.success(
-                "Ítem agregado correctamente."
-            )
+            st.session_state[
+                "form_item_version"
+            ] += 1
 
             st.rerun()
 
@@ -1066,22 +1283,69 @@ else:
                 f"**${subtotal_item:.2f}**"
             )
 
-            if st.button(
-                "ELIMINAR",
-                key=(
-                    f"eliminar_item_"
-                    f"{indice}"
-                ),
-                use_container_width=True,
-            ):
+            col_editar, col_eliminar = (
+                st.columns(2)
+            )
 
-                st.session_state[
-                    "items_cotizacion"
-                ].pop(
-                    indice
-                )
+            with col_editar:
 
-                st.rerun()
+                if st.button(
+                    "✏️ EDITAR",
+                    key=(
+                        f"editar_item_"
+                        f"{indice}"
+                    ),
+                    use_container_width=True,
+                ):
+
+                    st.session_state[
+                        "indice_item_edicion"
+                    ] = indice
+
+                    st.session_state[
+                        "item_edicion"
+                    ] = dict(
+                        st.session_state[
+                            "items_cotizacion"
+                        ][indice]
+                    )
+
+                    st.session_state[
+                        "form_item_version"
+                    ] += 1
+
+                    st.rerun()
+
+            with col_eliminar:
+
+                if st.button(
+                    "🗑️ ELIMINAR",
+                    key=(
+                        f"eliminar_item_"
+                        f"{indice}"
+                    ),
+                    use_container_width=True,
+                ):
+
+                    st.session_state[
+                        "items_cotizacion"
+                    ].pop(
+                        indice
+                    )
+
+                    st.session_state[
+                        "indice_item_edicion"
+                    ] = None
+
+                    st.session_state[
+                        "item_edicion"
+                    ] = None
+
+                    st.session_state[
+                        "form_item_version"
+                    ] += 1
+
+                    st.rerun()
 
 
 # =========================================================
@@ -1115,7 +1379,6 @@ with st.expander(
     descuento = st.number_input(
         "Descuento total",
         min_value=0.00,
-        value=0.00,
         step=0.01,
         format="%.2f",
         key="descuento_total",
@@ -1123,7 +1386,6 @@ with st.expander(
 
     aplica_iva = st.checkbox(
         "Aplicar IVA 15%",
-        value=True,
         key="aplica_iva",
     )
 
@@ -1183,25 +1445,21 @@ with st.expander(
 
     tiempo_entrega = st.text_input(
         "Tiempo de entrega",
-        value="ENTREGA INMEDIATA",
         key="tiempo_entrega",
     )
 
     validez = st.text_input(
         "Validez de la oferta",
-        value="7 DÍAS",
         key="validez_oferta",
     )
 
     lugar_entrega = st.text_input(
         "Lugar de entrega",
-        value="QUITO",
         key="lugar_entrega",
     )
 
     garantia = st.text_input(
         "Garantía",
-        value="SEGÚN FABRICANTE",
         key="garantia",
     )
 
@@ -1425,9 +1683,7 @@ if generar:
                 file_name=(
                     f"{nombre_archivo}.pdf"
                 ),
-                mime=(
-                    "application/pdf"
-                ),
+                mime="application/pdf",
                 key="descargar_pdf",
                 use_container_width=True,
             )
@@ -1487,6 +1743,10 @@ if st.button(
         "modo_edicion",
 
         "numero_original_edicion",
+
+        "indice_item_edicion",
+
+        "item_edicion",
     ]
 
     for clave in claves_a_eliminar:
@@ -1500,5 +1760,29 @@ if st.button(
     st.session_state[
         "fecha_cotizacion"
     ] = datetime.now().date()
+
+    st.session_state[
+        "items_cotizacion"
+    ] = []
+
+    st.session_state[
+        "modo_edicion"
+    ] = False
+
+    st.session_state[
+        "numero_original_edicion"
+    ] = ""
+
+    st.session_state[
+        "indice_item_edicion"
+    ] = None
+
+    st.session_state[
+        "item_edicion"
+    ] = None
+
+    st.session_state[
+        "form_item_version"
+    ] += 1
 
     st.rerun()
